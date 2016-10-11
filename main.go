@@ -41,7 +41,7 @@ var (
 	version    = "gomaker (undefined version)"
 	debug      = flag.Bool("debug", false, "Verbose logging to debug.log file")
 	outputFile = flag.String("o", "Makefile", "")
-	options    = flag.String("options", "static,lite,commit", "Options. Use --options=\"comma,sep,list\""+optionhelp)
+	options    = flag.String("options", "v,lite,commit", "Options. Use --options=\"comma,sep,list\""+optionhelp)
 	optionhelp = `
 
   [Options]
