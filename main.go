@@ -41,14 +41,15 @@ var (
 	version    = "gomaker (undefined version)"
 	debug      = flag.Bool("debug", false, "Verbose logging to debug.log file")
 	outputFile = flag.String("o", "Makefile", "")
-	options    = flag.String("options", "v,lite,commit", "Options. Use --options=\"comma,sep,list\""+optionhelp)
+	options    = flag.String("options", "static,verbose,lite,commit", "Options. Use --options=\"comma,sep,list\""+optionhelp)
 	optionhelp = `
 
   [Options]
   none: normal go build, Shell: go build
-  static: static linked binary, Shell: --ldflags '--static'
+  verbose: verbose build, Shell: go build -x
   lite:  no debug symbols, Shell: --ldflags '-s'
-  commit: try adding version info into the mix`
+  commit: try adding version info into the mix
+	static: try making a static linked binary (no deps)`
 )
 
 func main() {
@@ -112,7 +113,7 @@ func getOneGoFile(dirname string) (goFileName string) {
 	return ""
 }
 
-// Return the package name of a *.go file
+// Return the package name of a *.go file, (not with the word "package ")
 func gethead(dir, goFilename string) string {
 	if dir != "" {
 		dir += "/"
@@ -174,21 +175,23 @@ func builder(linein chan string, args string) {
 	for _, option := range op {
 
 		switch option {
+		case "static":
+			linein <- `export CGO_ENABLED=0`
 		case "commit":
 
 			linein <- `COMMIT=$(shell git rev-parse --verify --short HEAD)`
-			linein <- `RELEASE=${NAME}_${COMMIT}`
+			linein <- `RELEASE=${NAME}-c${COMMIT}`
 			ldflags += `-X main.version=$(RELEASE) `
 		case "lite":
 			ldflags += `-s `
 		case "none":
 			//buildstring = ""
-		case "v":
+		case "verbose":
 			buildflags += "-x "
 		}
 
 	}
-	linein <- "NAME="+projectName
+	linein <- "NAME=" + projectName
 	linein <- "\n"
 	linein <- "build:"
 	if ldflags != "" {
