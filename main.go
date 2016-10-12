@@ -91,6 +91,7 @@ func main() {
 	}
 
 	// Check if we are a go directory real quick
+	// TODO: save this scan for later?
 	if !func() bool {
 		for _, file := range dir {
 			name := file.Name()
@@ -106,8 +107,8 @@ func main() {
 	}
 
 	// Create the Makefile
-	fmt.Println("[Gomaker]" + version)
-	fmt.Println("[Gomaker] Makefile:\n" + args + "/Makefile")
+	fmt.Println("[Gomaker] " + version)
+	fmt.Println("[Makefile] " + args + "/Makefile")
 	fmt.Println("[Options]", *options)
 
 	var linein = make(chan string)
@@ -125,18 +126,18 @@ func fatal(ss ...interface{}) {
 	} else {
 		fmt.Printf(ss[0].(string), ss[1:])
 	}
-	os.Exit(1)
+	os.Exit(2)
 }
 
 // We need main or bust!
-// Uses getOneGoFile() and gethead() to determine if this Go project is a "main" project.
+// Uses getOneGoFile() and firstline() to determine if this Go project is a "main" project.
 func aMainPackage(directory string) bool {
 	randomGoFileName := getOneGoFile(directory)
 	if randomGoFileName == "" {
 		fatal("Bug: no Go files at", directory)
 		return false
 	}
-	pname := gethead(directory, randomGoFileName)
+	pname := firstline(directory, randomGoFileName)
 	if pname == "main" {
 		return true
 	}
@@ -161,7 +162,9 @@ func getOneGoFile(dirname string) (goFileName string) {
 }
 
 // Return the package name of a *.go file, (not with the word "package ")
-func gethead(dir, goFilename string) string {
+// Doesn't necessarily return the first line of a file.
+// Could be the last line, in the case of a doc.go file.
+func firstline(dir, goFilename string) string {
 	if dir != "" {
 		dir += "/"
 	}
@@ -173,12 +176,16 @@ func gethead(dir, goFilename string) string {
 	for scanner.Scan() {
 		s := scanner.Text()
 		if strings.HasPrefix(s, "package ") {
+			// Return the segment after package, before any comments.
+			// TODO: There may be no space, such as: 'package main// comment' In that case we would not pick this up.
 			return strings.Split(s, " ")[1]
 		}
 	}
 	if scanner.Err() != nil {
 		panic(scanner.Err())
 	}
+
+	// The file didn't have what we were looking for.
 	return ""
 }
 
@@ -261,29 +268,32 @@ func builder(linein chan string, args string) {
 	linein <- "all:\tbuild"
 	linein <- "\n"
 	linein <- "build:"
-	echoe := echoes(fmt.Sprintf("Building ${NAME} version ${RELEASE}"))
+	echoe := Echo(fmt.Sprintf("Building ${NAME} version ${RELEASE}"))
 	linein <- "\t" + echoe
 
 	linein <- "\tgo build -o ${NAME} " + buildflags + ldflags // build line
-	echoe = echoes(fmt.Sprintf("Successfully built ${NAME}"))
+	echoe = Echo(fmt.Sprintf("Successfully built ${NAME}"))
 	linein <- "\t" + echoe
 	linein <- "\n"
 	linein <- "install:"
-	linein <- "\t" + echoes("PREFIX=${PREFIX}")
+	linein <- "\t" + Echo("PREFIX=${PREFIX}")
 	linein <- "\t@mkdir -p ${PREFIX}"
 	linein <- "\t@mv ${NAME} ${PREFIX}/${NAME}"
-	echoe = echoes(fmt.Sprintf("Successfully installed ${NAME} to ${PREFIX}"))
+	echoe = Echo(fmt.Sprintf("Successfully installed ${NAME} to ${PREFIX}"))
 	linein <- "\t" + echoe
+
+	linein <- "run:"
+	linein <- "\t CGO_ENABLED=1 go run -v -x *.go"
 	linein <- "EOT" // End of transmission.
 }
 
 // Single quote a string
 func quote(s string) string {
-
 	return `'` + s + `'`
 }
 
-func echoes(s string) string {
+// Echo turns a (possibly multiline) string into a @echo 'line'
+func Echo(s string) string {
 	var makelines string
 	lines := strings.Split(s, "\n")
 	for _, line := range lines {
