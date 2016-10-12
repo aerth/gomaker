@@ -49,7 +49,9 @@ var (
   verbose: verbose build, Shell: go build -x
   lite:  no debug symbols, Shell: --ldflags '-s'
   commit: try adding version info into the mix
-	static: try making a static linked binary (no deps)`
+	static: try making a static linked binary (no deps)
+
+	`
 )
 
 func main() {
