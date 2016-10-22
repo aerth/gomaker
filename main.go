@@ -6,13 +6,13 @@ Makefile generator for Go projects
 
 Use like this:
 
-    gomaker -o Makefile --options "static,lite,commit"
+    gomaker -o Makefile --options "static,lite,commit,verbose"
 
 With the default settings, that same command is typed:
 
     gomaker .
 
-To build with a literal "go build", `gomaker --options "none"`
+To build with a simple "go build", use `gomaker --options "none" .`
 
 Here are the options, they should be comma separated in the -options="" flag, inside double quotes.
 	none: normal go build, Shell: go build
@@ -33,8 +33,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aerth/filer"
+	clr "github.com/daviddengcn/go-colortext"
 )
 
 var (
@@ -43,6 +45,8 @@ var (
 	outputFile    = flag.String("o", "Makefile", "")
 	versionNumber = flag.String("version", "", "Include Version (v4.3.2), will be prefixed to commit option.")
 	options       = flag.String("options", "static,verbose,lite,commit", "Options. Use --options=\"comma,sep,list\"")
+	tagsIN        = flag.String("tags", "", "build -tags, for example: -tags='gtk,demo'")
+	ldflagsIN     = flag.String("ldflags", "", "additional custom ldflags")
 	optionhelp    = `
 
   [Options]
@@ -50,43 +54,46 @@ var (
   verbose: verbose build, Shell: go build -x
   lite:  no debug symbols, Shell: --ldflags '-s'
   static: try making a static linked binary (no deps)
-  commit: try adding version info into the mix
-`
+  commit: try adding version info into the mix`
 )
 
 func init() {
 	usage := flag.Usage
 	flag.Usage = func() {
-		fmt.Println("[Gomaker] " + version + "\n")
-		fmt.Println("Default:")
-		fmt.Println("gomaker -o Makefile -options='static,verbose,lite,commit' .")
-		fmt.Println()
-		fmt.Println("Can be shortened to:")
-		fmt.Println("gomaker .")
-		fmt.Println()
+		fmt.Fprintln(os.Stderr, "[Gomaker] "+version+"\n")
+		fmt.Fprintln(os.Stderr, "Default:")
+		fmt.Fprintln(os.Stderr, "gomaker -o Makefile -options='static,verbose,lite,commit' .")
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "Can be shortened to:")
+		fmt.Fprintln(os.Stderr, "gomaker .")
+		fmt.Fprintln(os.Stderr, "")
 		usage()
-		fmt.Println(optionhelp)
-		os.Exit(2)
+		fmt.Fprintln(os.Stderr, optionhelp)
+		fmt.Fprintln(os.Stderr, "")
 	}
 }
 func main() {
+
 	flag.Parse()
 	if len(flag.Args()) > 1 {
 		if strings.Contains(flag.Arg(1), "-") {
-			fmt.Println("[ Error: Flags after directory name ]")
+			fmt.Fprintln(os.Stderr, "Fatal:  Flags after directory name")
 		} else {
-			fmt.Println("[ Error: Too many arguments. Only need one. ]")
+			fmt.Fprintln(os.Stderr, "Fatal: Too many arguments, only need one")
 		}
-		flag.Usage()
+		os.Exit(2)
 	}
 	args := flag.Arg(0)
+	if args == "" {
+		fmt.Fprintln(os.Stderr, "Fatal: Need Go project as argument")
+		os.Exit(2)
+	}
 	if args == "." {
 		args = os.Getenv("PWD")
 	}
 
 	dir, err := ioutil.ReadDir(args)
 	if err != nil {
-		flag.Usage()
 		fatal(err)
 	}
 
@@ -101,11 +108,17 @@ func main() {
 		}
 		return false
 	}() {
-		fmt.Println("Not a Go project directory.")
-		flag.Usage()
+		fmt.Fprintln(os.Stderr, "Fatal: Not a Go project directory.")
 		os.Exit(2)
 	}
 
+	// Green means GO!
+	clr.ChangeColor(clr.Black, true, clr.Green, true)
+	defer func() {
+		clr.ResetColor()
+		fmt.Println()
+		fmt.Println()
+	}()
 	// Create the Makefile
 	fmt.Println("[Gomaker] " + version)
 	fmt.Println("[Makefile] " + args + "/Makefile")
@@ -122,9 +135,9 @@ func main() {
 // Fatal Error
 func fatal(ss ...interface{}) {
 	if len(ss) == 1 {
-		fmt.Println(ss)
+		fmt.Fprintln(os.Stderr, ss)
 	} else {
-		fmt.Printf(ss[0].(string), ss[1:])
+		fmt.Fprintln(os.Stderr, ss[0].(string), ss[1:])
 	}
 	os.Exit(2)
 }
@@ -191,8 +204,7 @@ func firstline(dir, goFilename string) string {
 
 // Listen on the linein chan, writing lines to Makefile.
 func writer(linein chan string) {
-	filer.Create(*outputFile)
-	filer.Write(*outputFile, []byte(""))
+
 	for {
 		select {
 		case line := <-linein:
@@ -207,7 +219,6 @@ func writer(linein chan string) {
 }
 
 func builder(linein chan string, args string) {
-
 	// Lib support soon come
 	if !aMainPackage(args) {
 		os.Exit(2)
@@ -226,6 +237,29 @@ func builder(linein chan string, args string) {
 		op = []string{"none"}
 	}
 
+	// Backup old Makefile to /tmp/gomaker-UnixTime
+	b, e := ioutil.ReadFile(*outputFile)
+	if e != nil {
+		if !strings.Contains(e.Error(), "no such") {
+			panic(e)
+		}
+	}
+	if len(b) > 0 {
+		fmt.Println("[Backup] Found existing", *outputFile)
+		time := strconv.Itoa(int(time.Now().Unix()))
+		bkup := os.TempDir() + "/gomaker-" + time
+		e := ioutil.WriteFile(bkup, b, 0755)
+		if e != nil {
+			clr.ResetColor()
+			panic(e)
+		}
+		fmt.Println("[Backup] Saved to:", bkup)
+	}
+
+	// Blank file
+	filer.Touch(*outputFile)
+	filer.Write(*outputFile, []byte(""))
+
 	// Start writing. This will block until we are ready to write.
 	fmt.Println("[Project]", projectName)
 	linein <- "# " + projectName
@@ -240,6 +274,12 @@ func builder(linein chan string, args string) {
 	}
 	linein <- "PREFIX ?= /usr/local/bin"
 	var ldflags, buildflags string
+	if *ldflagsIN != "" {
+		ldflags += *ldflagsIN
+	}
+	if *tagsIN != "" {
+		buildflags += "-tags " + strconv.Quote(*tagsIN)
+	}
 	for _, option := range op {
 
 		switch option {
