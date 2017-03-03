@@ -1,26 +1,7 @@
-/*
-
-gomaker
-
-Makefile generator for Go projects
-
-Use like this:
-
-    gomaker -o Makefile --options "static,lite,commit,verbose"
-
-With the default settings, that same command is typed:
-
-    gomaker .
-
-To build with a simple "go build", use `gomaker --options "none" .`
-
-Here are the options, they should be comma separated in the -options="" flag, inside double quotes.
-	none: normal go build, Shell: go build
-	verbose: verbose build, Shell: go build -x
-	lite:  no debug symbols, Shell: --ldflags '-s'
-	static: try making a static linked binary (no deps)
-	commit: try adding version info into the mix
-*/
+// aerth <aerth(at)riseup.net>
+// copyright (c) 2016, 2017
+// free open source (MIT)
+// latest version: github.com/aerth/gomaker
 
 // Gomaker is a Makefile generator for Go programs
 package main
@@ -36,65 +17,97 @@ import (
 	"time"
 
 	"github.com/aerth/filer"
-	clr "github.com/daviddengcn/go-colortext"
-)
-
-var (
-	version       = "(undefined version)"
-	debug         = flag.Bool("debug", false, "Verbose logging to debug.log file")
-	outputFile    = flag.String("o", "Makefile", "")
-	versionNumber = flag.String("version", "", "Include Version (v4.3.2), will be prefixed to commit option.")
-	options       = flag.String("options", "static,verbose,lite,commit", "Options. Use --options=\"comma,sep,list\"")
-	tagsIN        = flag.String("tags", "", "build -tags, for example: -tags='gtk,demo'")
-	ldflagsIN     = flag.String("ldflags", "", "additional custom ldflags")
-	optionhelp    = `
-
-  [Options]
-  none: normal go build, Shell: go build
-  verbose: verbose build, Shell: go build -x
-  lite:  no debug symbols, Shell: --ldflags '-s'
-  static: try making a static linked binary (no deps)
-  commit: try adding version info into the mix`
+	clr "github.com/daviddengcn/go-colortext" // removing
 )
 
 func init() {
+	flag.StringVar(options, "o", "v,l,s,g", "Short for --options")  // o short option
+	flag.StringVar(versionNumber, "ver", "", "Short for --version") // ver short version
+}
+
+var (
+	version       = "(go get -v -x github.com/aerth/gomaker)"
+	debug         = flag.Bool("debug", false, "Verbose logging to debug.log file")
+	verbose       = flag.Bool("v", false, "Output to standard output, not Makefile. Use like 'gomaker -v > Makefile'")
+	outputFile    = flag.String("out", "Makefile", "")
+	versionNumber = flag.String("version", "", "Include Version (v4.3.2), will be prefixed to commit option.")
+	options       = flag.String("options", "static,verbose,lite,gitcommit", "Options. Use --options=\"comma,sep,list\"")
+	tagsIN        = flag.String("tag", "", "build -tags, for example: -tags='gtk,demo'")
+	ldflagsIN     = flag.String("ldflags", "", "additional custom ldflags")
+	sub           = flag.String("sub", "", "Substitute package variables (string only)")
+
+	optionhelp = `
+
+  [Options] *Use first key*
+  [n]one: normal go build, Shell: go build
+  [v]erbose: verbose build, Shell: go build -x
+  [l]ite:  no debug symbols, Shell: --ldflags '-s'
+  [s]tatic: try making a static linked binary (no deps)
+  [g]itcommit: try adding version info into the mix
+  [+]cgo: set CGO_ENABLED=1
+  [-]cgo: set CGO_ENABLED=0
+  [e]rror: try to build with errors`
+)
+
+func init() {
+	// redefine flag.Usage
 	usage := flag.Usage
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "[Gomaker] "+version+"\n")
 		fmt.Fprintln(os.Stderr, "Default:")
-		fmt.Fprintln(os.Stderr, "gomaker -o Makefile -options='static,verbose,lite,commit' .")
+		fmt.Fprintln(os.Stderr, "gomaker -o Makefile -options='static,verbose,lite,gitcommit' .")
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "Can be shortened to:")
 		fmt.Fprintln(os.Stderr, "gomaker .")
 		fmt.Fprintln(os.Stderr, "")
 		usage()
 		fmt.Fprintln(os.Stderr, optionhelp)
-		fmt.Fprintln(os.Stderr, "")
 	}
 }
 func main() {
-
 	flag.Parse()
 	if len(flag.Args()) > 1 {
+		// bad flags
 		if strings.Contains(flag.Arg(1), "-") {
-			fmt.Fprintln(os.Stderr, "Fatal:  Flags after directory name")
+			fmt.Fprintln(os.Stderr, "Fatal: -flags after directory name")
 		} else {
-			fmt.Fprintln(os.Stderr, "Fatal: Too many arguments, only need one")
+			fmt.Fprintln(os.Stderr, "Fatal: too many arguments")
 		}
 		os.Exit(2)
 	}
+
+	// no args
 	args := flag.Arg(0)
-	if args == "" {
-		fmt.Fprintln(os.Stderr, "Fatal: Need Go project as argument")
+
+	// make 'gomaker -v > Makefile' possible
+	if *verbose && args == "" {
+		args = "."
+	}
+
+	// 'gomaker' or 'gomaker -o g,l,s,d' (no args)
+	if args == "" && !*verbose {
+		flag.Usage()
+		fmt.Fprintln(os.Stderr, "Fatal: need go main project directory as argument")
 		os.Exit(2)
 	}
+
+	// standard usage
+	// gomaker .
 	if args == "." {
-		args = os.Getenv("PWD")
+		var err error
+		args, err = os.Getwd()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		args = strings.Replace(args, "//", "/", -1)
 	}
 
 	dir, err := ioutil.ReadDir(args)
 	if err != nil {
-		fatal(err)
+		fmt.Fprintln(os.Stderr, "Usage:")
+		flag.Usage()
+		fmt.Fprintln(os.Stderr, "Not a directory.", err.Error())
 	}
 
 	// Check if we are a go directory real quick
@@ -116,16 +129,13 @@ func main() {
 	clr.ChangeColor(clr.Black, true, clr.Green, true)
 	defer func() {
 		clr.ResetColor()
-		fmt.Println()
-		fmt.Println()
+		fmt.Fprint(os.Stderr, "")
 	}()
 	// Create the Makefile
-	fmt.Println("[Gomaker] " + version)
-	fmt.Println("[Makefile] " + args + "/Makefile")
-	fmt.Println("[Options]", *options)
+	fmt.Fprintln(os.Stderr, "[Gomaker] "+version)
+	fmt.Fprintln(os.Stderr, "[Makefile] "+args+"/Makefile")
 
 	var linein = make(chan string)
-
 	// Send things to linein
 	go builder(linein, args)
 	// Write lines to file
@@ -162,7 +172,7 @@ func aMainPackage(directory string) bool {
 func getOneGoFile(dirname string) (goFileName string) {
 	fileinfo, err := ioutil.ReadDir(dirname)
 	if err != nil {
-		fmt.Println("Gomaker:", err)
+		fmt.Fprintln(os.Stderr, "Gomaker:", err)
 		os.Exit(0)
 	}
 	for _, file := range fileinfo {
@@ -209,25 +219,35 @@ func writer(linein chan string) {
 		select {
 		case line := <-linein:
 			if line == "EOT" {
-				fmt.Println("[Gomaker] Makefile generated.")
+				fmt.Fprintln(os.Stderr, "[Gomaker] Makefile generated.")
 				close(linein)
 				return
 			}
-			filer.Append(*outputFile, []byte(line+"\n"))
+			if *verbose {
+				fmt.Fprintln(os.Stderr, line)
+			} else {
+				filer.Append(*outputFile, []byte(line+"\n"))
+			}
 		}
 	}
 }
 
 func builder(linein chan string, args string) {
-	// Lib support soon come
+	// non-main package support soon come
 	if !aMainPackage(args) {
-		os.Exit(2)
+		if !strings.Contains(strings.Join(os.Args, " "), "-f") {
+			os.Exit(2)
+		}
 	}
 
 	// Since 'go build' uses the directory name as binary name, let's do the same.
 	dirname := strings.Split(args, "/")
 	projectName := dirname[len(dirname)-1]
 
+	if strings.Trim(projectName, "") == "" {
+		fmt.Fprint(os.Stderr, "No project name found.\n")
+		os.Exit(1)
+	}
 	// Iterate options
 	op := strings.Split(*options, ",")
 	if len(op) == 1 && op[0] == "" {
@@ -235,6 +255,11 @@ func builder(linein chan string, args string) {
 	}
 	if strings.Contains(*options, "none") {
 		op = []string{"none"}
+	}
+
+	if strings.Split(op[0], "")[0] == "n" {
+		fmt.Fprintf(os.Stderr, "[no options]")
+		op = nil
 	}
 
 	// Backup old Makefile to /tmp/gomaker-UnixTime
@@ -245,7 +270,7 @@ func builder(linein chan string, args string) {
 		}
 	}
 	if len(b) > 0 {
-		fmt.Println("[Backup] Found existing", *outputFile)
+		fmt.Fprintln(os.Stderr, "[Backup] Found existing", *outputFile)
 		time := strconv.Itoa(int(time.Now().Unix()))
 		bkup := os.TempDir() + "/gomaker-" + time
 		e := ioutil.WriteFile(bkup, b, 0755)
@@ -253,7 +278,7 @@ func builder(linein chan string, args string) {
 			clr.ResetColor()
 			panic(e)
 		}
-		fmt.Println("[Backup] Saved to:", bkup)
+		fmt.Fprintln(os.Stderr, "[Backup] Saved to:", bkup)
 	}
 
 	// Blank file
@@ -261,61 +286,105 @@ func builder(linein chan string, args string) {
 	filer.Write(*outputFile, []byte(""))
 
 	// Start writing. This will block until we are ready to write.
-	fmt.Println("[Project]", projectName)
+	fmt.Fprintln(os.Stderr, "[Project Name]", projectName)
 	linein <- "# " + projectName
-	linein <- "# " + "Makefile generated by Gomaker " + version
-
-	linein <- "\n"
-	linein <- "NAME=" + projectName
+	linein <- "# " + "Makefile generated by 'gomaker' " + version
+	linein <- ""
+	linein <- "NAME ?= " + projectName
 	if *versionNumber != "" {
-		linein <- "VERSION = " + *versionNumber + "."
+		linein <- "VERSION ?= " + *versionNumber + "."
 	} else {
-		linein <- "VERSION="
+		linein <- "VERSION ?= "
 	}
 	linein <- "PREFIX ?= /usr/local/bin"
-	var ldflags, buildflags string
+	var ldflags, buildflags, gcflags string
 	if *ldflagsIN != "" {
 		ldflags += *ldflagsIN
 	}
 	if *tagsIN != "" {
 		buildflags += "-tags " + strconv.Quote(*tagsIN)
 	}
-	for _, option := range op {
+	if op != nil {
+		fmt.Fprintf(os.Stderr, "[Options] ")
+		for i, optionstr := range op {
 
-		switch option {
-		case "static":
-			linein <- `export CGO_ENABLED=0`
-		case "commit":
-			linein <- `COMMIT=$(shell git rev-parse --verify --short HEAD)`
-			linein <- `RELEASE=${VERSION}${COMMIT}`
-			ldflags += `-X main.version=${RELEASE} ` // append ldflags
-		case "lite":
-			ldflags += `-s ` // append ldflags
-		case "none":
-			//buildstring = ""
-		case "verbose":
-			buildflags += "-x "
-		default:
-			fmt.Println("WARNING:", option, "is not a real option. Skipping.")
+			option := []rune(optionstr)[0:1]
+			fmt.Fprintf(os.Stderr, "%s", string(option))
+			if i == len(op)-1 {
+				fmt.Fprintf(os.Stderr, "\n")
+			} else {
+				fmt.Fprintf(os.Stderr, ",")
+			}
+			// additional ldflags and cgflags need extra space
+			switch option[0] {
+			case rune('s'):
+				ldflags += `-extldflags='-static' `
+			case rune('e'):
+				gcflags += `-e `
+			case rune('+'):
+				linein <- `export CGO_ENABLED=1`
+			case rune('-'):
+				linein <- `export CGO_ENABLED=0`
+			case rune('g'), rune('c'):
+				// VER=38
+				linein <- `VER ?= X`
+				linein <- `COMMIT=$(shell git rev-parse --verify --short HEAD)`
+				linein <- `COMMIT ?= ${VER}`
+				linein <- `RELEASE ?= ${VERSION}${COMMIT}`
+				ldflags += `-X main.version=${RELEASE} ` // append ldflags
+			case rune('l'):
+				ldflags += `-s ` // append ldflags
+			case rune('n'):
+				//buildstring = ""
+			case rune('v'):
+				buildflags += "-x "
+			default:
+				fmt.Fprintln(os.Stderr, "WARNING:", option, "is not a real option. Skipping.")
+			}
 		}
-
 	}
+	if *sub != "" {
+		fmt.Fprintln(os.Stderr, "[Variable Substitutions]")
+		for _, v := range strings.Split(*sub, ",") {
+			if !strings.Contains(v, "=") {
+				fmt.Fprintf(os.Stderr, "Variable substitution has no '=' sign.")
+				os.Exit(1)
+			}
+			key, value :=
+				func(s string) (string, string) {
+					k := strings.Split(s, "=")
+					return k[0], k[1]
+				}(v)
+			if key == "" || value == "" {
+				fmt.Fprintf(os.Stderr, "Invalid variable substitution: %s=%s", key, value)
+				os.Exit(1)
+			}
 
+			fmt.Fprintf(os.Stderr, "Defining variable %q as %q", key, value)
+			ldflags += fmt.Sprintf(`-X %s=%s `, key, value)
+		}
+	}
 	if ldflags != "" {
-		ldflags = "--ldflags " + strconv.Quote(ldflags)
+		ldflags = strings.Replace(strconv.Quote(ldflags), ` "`, `"`, -1)
+		ldflags = "--ldflags " + ldflags
+	}
+	if gcflags != "" {
+		gcflags = "--cgflags " + strconv.Quote(gcflags)
 	}
 	linein <- "\n"
-	linein <- "all:\tbuild"
+	linein <- "all:\t${NAME}"
 	linein <- "\n"
 	linein <- "build:"
 	echoe := Echo(fmt.Sprintf("Building ${NAME} version ${RELEASE}"))
 	linein <- "\t" + echoe
 
-	linein <- "\tgo build -o ${NAME} " + buildflags + ldflags // build line
+	linein <- "\tgo build -o ${NAME} " + fmt.Sprint(buildflags, ldflags, gcflags)
 	echoe = Echo(fmt.Sprintf("Successfully built ${NAME}"))
 	linein <- "\t" + echoe
 	linein <- "\n"
-	linein <- "install:"
+	linein <- "${NAME}: build"
+	linein <- "\n"
+	linein <- "install: ${NAME}"
 	linein <- "\t" + Echo("PREFIX=${PREFIX}")
 	linein <- "\t@mkdir -p ${PREFIX}"
 	linein <- "\t@mv ${NAME} ${PREFIX}/${NAME}"
@@ -323,7 +392,11 @@ func builder(linein chan string, args string) {
 	linein <- "\t" + echoe
 
 	linein <- "run:"
-	linein <- "\t CGO_ENABLED=1 go run -v -x *.go"
+	linein <- "\tgo run -v -x $(shell ls *.go | grep -v _test.go)"
+	linein <- "\n"
+	linein <- "clean:"
+	linein <- "\t@rm -v ${NAME}"
+
 	linein <- "EOT" // End of transmission.
 }
 
