@@ -224,7 +224,7 @@ func writer(linein chan string) {
 				return
 			}
 			if *verbose {
-				fmt.Fprintln(os.Stderr, line)
+				fmt.Fprintln(os.Stdout, line)
 			} else {
 				filer.Append(*outputFile, []byte(line+"\n"))
 			}
