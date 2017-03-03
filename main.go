@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/aerth/filer"
-	clr "github.com/daviddengcn/go-colortext" // removing
 )
 
 func init() {
@@ -37,7 +36,7 @@ var (
 	sub           = flag.String("sub", "", "Substitute package variables (string only)")
 
 	optionhelp = `
-
+  [gomaker] `+version+` by <aerth>
   [Options] *Use first key*
   [n]one: normal go build, Shell: go build
   [v]erbose: verbose build, Shell: go build -x
@@ -125,12 +124,6 @@ func main() {
 		os.Exit(2)
 	}
 
-	// Green means GO!
-	clr.ChangeColor(clr.Black, true, clr.Green, true)
-	defer func() {
-		clr.ResetColor()
-		fmt.Fprint(os.Stderr, "")
-	}()
 	// Create the Makefile
 	fmt.Fprintln(os.Stderr, "[Gomaker] "+version)
 	fmt.Fprintln(os.Stderr, "[Makefile] "+args+"/Makefile")
@@ -258,7 +251,7 @@ func builder(linein chan string, args string) {
 	}
 
 	if strings.Split(op[0], "")[0] == "n" {
-		fmt.Fprintf(os.Stderr, "[no options]")
+		fmt.Fprintln(os.Stderr, "[no options]")
 		op = nil
 	}
 
@@ -266,7 +259,8 @@ func builder(linein chan string, args string) {
 	b, e := ioutil.ReadFile(*outputFile)
 	if e != nil {
 		if !strings.Contains(e.Error(), "no such") {
-			panic(e)
+			fmt.Fprintln(os.Stderr, e)
+			os.Exit(1)
 		}
 	}
 	if len(b) > 0 {
@@ -275,8 +269,8 @@ func builder(linein chan string, args string) {
 		bkup := os.TempDir() + "/gomaker-" + time
 		e := ioutil.WriteFile(bkup, b, 0755)
 		if e != nil {
-			clr.ResetColor()
-			panic(e)
+			fmt.Fprintln(os.Stderr, e)
+			os.Exit(1)
 		}
 		fmt.Fprintln(os.Stderr, "[Backup] Saved to:", bkup)
 	}
@@ -384,7 +378,7 @@ func builder(linein chan string, args string) {
 	linein <- "\n"
 	linein <- "${NAME}: build"
 	linein <- "\n"
-	linein <- "install: ${NAME}"
+	linein <- "install:"
 	linein <- "\t" + Echo("PREFIX=${PREFIX}")
 	linein <- "\t@mkdir -p ${PREFIX}"
 	linein <- "\t@mv ${NAME} ${PREFIX}/${NAME}"
