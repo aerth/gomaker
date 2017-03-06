@@ -86,7 +86,7 @@ func main() {
 	// 'gomaker' or 'gomaker -o g,l,s,d' (no args)
 	if args == "" && !*verbose {
 		flag.Usage()
-		fmt.Fprintln(os.Stderr, "Fatal: need go main project directory as argument")
+		fmt.Fprintln(os.Stderr, "Fatal: need go main project directory as argument. Try 'gomaker .'")
 		os.Exit(2)
 	}
 
