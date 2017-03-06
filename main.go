@@ -371,7 +371,7 @@ func builder(linein chan string, args string) {
 	linein <- "build:"
 	echoe := Echo(fmt.Sprintf("Building ${NAME} version ${RELEASE}"))
 	linein <- "\t" + echoe
-
+	linein <- "\tgo get -d -x -v ."
 	linein <- "\tgo build -o ${NAME} " + fmt.Sprint(buildflags, ldflags, gcflags)
 	echoe = Echo(fmt.Sprintf("Successfully built ${NAME}"))
 	linein <- "\t" + echoe
