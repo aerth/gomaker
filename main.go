@@ -163,7 +163,7 @@ func aMainPackage(directory string) bool {
 	if pname == "main" {
 		return true
 	}
-	fatal("Not a main project: ", pname, directory+randomGoFileName)
+	fatal("Not a main project: ", directory)
 	return false
 }
 
