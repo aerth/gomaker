@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ func init() {
 	// redefine flag.Usage
 	usage := flag.Usage
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "[Gomaker] "+version+"\n")
+		fmt.Fprintln(os.Stderr, "[Gomaker "+version+"]\n")
 		fmt.Fprintln(os.Stderr, "Default:")
 		fmt.Fprintln(os.Stderr, "gomaker -o Makefile -options='static,verbose,lite,gitcommit' .")
 		fmt.Fprintln(os.Stderr, "gomaker -o Makefile -options='static,verbose,lite,gitcommit' ./cmd/name")
@@ -73,21 +74,20 @@ func main() {
 		} else {
 			flag.Usage()
 			fmt.Fprintf(os.Stderr, "error: need only one argument. got %v.\n", len(flag.Args()))
-
 		}
 		os.Exit(2)
 	}
 
 	// no args
-	args := flag.Arg(0)
+	projectDir := flag.Arg(0)
 
 	// make 'gomaker -v > Makefile' possible
-	if *verbose && args == "" {
-		args = "."
+	if *verbose && projectDir == "" {
+		projectDir = "."
 	}
 
 	// 'gomaker' or 'gomaker -o g,l,s,d' (no args)
-	if args == "" && !*verbose {
+	if projectDir == "" && !*verbose {
 		flag.Usage()
 		fmt.Fprintln(os.Stderr, "Fatal: need go main project directory as argument. Try 'gomaker .'")
 		os.Exit(2)
@@ -95,18 +95,18 @@ func main() {
 
 	// standard usage
 	// gomaker .
-	if args == "." {
+
+	if projectDir == "." {
 		var err error
-		args, err = os.Getwd()
+		projectDir, err = os.Getwd()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		args = strings.Replace(args, "//", "/", -1)
+		projectDir = strings.Replace(projectDir, "//", "/", -1)
 	}
 
-	projectDirectory := args
-	dir, err := ioutil.ReadDir(args)
+	dir, err := ioutil.ReadDir(projectDir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Usage:")
 		flag.Usage()
@@ -128,15 +128,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Fatal: Not a Go project directory.")
 		os.Exit(2)
 	}
-	fmt.Fprintf(os.Stderr, "[Directory] %q", projectDirectory)
 
 	// Create the Makefile
-	fmt.Fprintln(os.Stderr, "[Gomaker] "+version)
-	fmt.Fprintln(os.Stderr, "[Makefile] "+*outputFile)
+	fmt.Fprintln(os.Stderr, "[Gomaker v"+version+"]")
+	fmt.Fprintf(os.Stderr, "[Makefile] %q\n", *outputFile)
+	fmt.Fprintf(os.Stderr, "[Project Dir] %q\n", projectDir)
 
 	var linein = make(chan string)
 	// Send things to linein
-	go builder(linein, projectDirectory)
+	go builder(linein, projectDir)
 	// Write lines to file
 	writer(linein)
 }
@@ -169,10 +169,12 @@ func aMainPackage(directory string) bool {
 
 // Since all proper Go source files have an uncommented package name, this works!
 func getOneGoFile(dirname string) (goFileName string) {
-	fileinfo, err := ioutil.ReadDir(dirname)
+	fmt.Fprintln(os.Stderr, dirname)
+	abs, _ := filepath.Abs(dirname)
+	fileinfo, err := ioutil.ReadDir(abs)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Gomaker:", err)
-		os.Exit(0)
+		os.Exit(1)
 	}
 	for _, file := range fileinfo {
 		n := file.Name()
@@ -232,14 +234,17 @@ func writer(linein chan string) {
 }
 
 func builder(linein chan string, dir string) {
+
+	if dir == "." {
+		dir, _ = os.Getwd()
+	}
+	fmt.Println("dir:", dir)
 	// non-main package support soon come
-	fmt.Println("Checking", dir)
 	if !aMainPackage(dir) {
 		if !strings.Contains(strings.Join(os.Args, " "), "-f") {
 			os.Exit(2)
 		}
 	}
-	fmt.Println(dir, "is a main package")
 	// Since 'go build' uses the directory name as binary name, let's do the same.
 	dir = strings.TrimSuffix(dir, "/")
 	dirname := strings.Split(dir, "/")
@@ -380,7 +385,7 @@ func builder(linein chan string, dir string) {
 	echoe := Echo(fmt.Sprintf("Building ${NAME} version ${RELEASE}"))
 	linein <- "\t" + echoe
 	linein <- "\tgo get -d -x -v ."
-	linein <- "\tgo build -o ${NAME} " + fmt.Sprint(buildflags, ldflags, gcflags) + " " + dir
+	linein <- "\tgo build -o ${NAME} " + fmt.Sprint(buildflags, ldflags, gcflags) + " " + flag.Arg(0)
 	echoe = Echo(fmt.Sprintf("Successfully built ${NAME}"))
 	linein <- "\t" + echoe
 	linein <- "\n"
