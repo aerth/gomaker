@@ -8,6 +8,7 @@ on:
   pull_request:
     paths-ignore:
       - '**.md'
+needs: [create_release]
   # on:
   #  push:
   #    branches:
@@ -30,4 +31,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          releaseId: ${{ needs.create_release.outputs.id }}
           args: 'bin/*'
