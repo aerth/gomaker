@@ -1,5 +1,4 @@
-// aerth <aerth(at)riseup.net>
-// copyright (c) 2016, 2017, 2020
+// copyright (c) 2016, 2017, 2020 aerth
 // free open source (MIT)
 // latest version: github.com/aerth/gomaker
 
