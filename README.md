@@ -3,11 +3,11 @@
 Use like this:
 
 ```
-gomaker .
+gomaker
 
 ```
 
-Output: ./Makefile
+Output: ./makefile
 
 More usage info with gomaker -h
 
