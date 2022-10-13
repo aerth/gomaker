@@ -15,7 +15,6 @@ on:
   #  release:
   #    types: [created]
 jobs:
-  needs: [create_release]
   generate:
     name: Create release-artifacts
     runs-on: ubuntu-latest
@@ -31,5 +30,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ needs.create_release.outputs.id }}
           args: 'bin/*'
