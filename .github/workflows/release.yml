@@ -31,7 +31,7 @@ jobs:
             ${{ github.workspace }}/README.md
             bin/*
           artifactContentType: "raw"
-          discussionCategory: "Release"
+          #discussionCategory: "Release"
           draft: false
           generateReleaseNotes: true
           prerelease: false
