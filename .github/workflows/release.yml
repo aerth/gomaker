@@ -21,24 +21,23 @@ jobs:
         uses: skx/github-action-build@master
         with:
           builder: .github/build
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish release
+        id: release
+        uses: ncipollo/release-action@v1.11.1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            This is dummy releass 
-            - First Change
-            - Second Change
+          allowUpdates: true
+          artifactErrorsFailBuild: false
+          artifacts: |
+            ${{ github.workspace }}/README.md
+            bin/*
+          artifactContentType: "raw"
+          discussionCategory: "Release"
           draft: false
+          generateReleaseNotes: true
           prerelease: false
-      - name: Upload the artifacts
-        uses: skx/github-action-publish-binaries@master
+          replacesArtifacts: true
+          omitDraftDuringUpdate: false
+      - name: Dump Release Outputs
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: 'bin/*'
-          releaseId: ${{ steps.create_release.outputs.id }}
+          RELEASE_OUTPUT: ${{ toJson(steps.release.outputs) }}
+        run: echo "$RELEASE_OUTPUT"
