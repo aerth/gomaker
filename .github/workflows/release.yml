@@ -39,6 +39,6 @@ jobs:
         uses: skx/github-action-publish-binaries@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_ID: ${{ github.ref }}
         with:
           args: 'bin/*'
+          releaseId: ${{ steps.create_release.outputs.id }}
