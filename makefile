@@ -4,6 +4,7 @@
 module != go list -m
 name != basename ${module}
 gofiles != find . -name '*.go'
+gopath != go env GOPATH
 VERSION=$(shell git describe --tags 2>/dev/null)
 ifeq (,$(VERSION))
 VERSION=0.0.1
@@ -12,6 +13,7 @@ COMMIT=$(shell git rev-parse --verify --short HEAD 2>/dev/null)
 ifeq (,$(COMMIT))
 COMMIT=none
 endif
+
 
 # EDIT ME files to embed
 EMBED_ARGS=./makefile
@@ -35,7 +37,8 @@ bin/${name}: go.mod ./assets/assets.go $(gofiles)
 	mkdir -p bin
 	cd bin && $(call buildfunc,../)
 ./assets/assets.go: ${EMBED_ARGS}
-	type go-bindata || go install github.com/aerth/go-bindata
+	@export PATH=${PATH}:${gopath}/bin
+	type go-bindata || GOBIN=${gopath}/bin go install github.com/aerth/go-bindata
 	go-bindata -pkg assets -o $@ ${EMBED_ARGS}
 # cross compile release
 crossdirs ?= bin/linux bin/freebsd bin/osx bin/windows
