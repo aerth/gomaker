@@ -15,8 +15,8 @@ on:
   #  release:
   #    types: [created]
 jobs:
+  needs: [create_release]
   generate:
-    needs: [create_release]
     name: Create release-artifacts
     runs-on: ubuntu-latest
     steps:
