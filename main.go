@@ -9,11 +9,20 @@ import (
 	"os/exec"
 )
 
+var version string
+var commit string
+
 func main() {
 	log.SetFlags(0)
 	var run bool
+	var showversion bool
 	flag.BoolVar(&run, "run", false, "run 'make' after creating makefile")
+	flag.BoolVar(&showversion, "v", false, "show version and quit")
 	flag.Parse()
+	log.Printf("%s version %s-%s", os.Args[0], version, commit)
+	if showversion {
+		os.Exit(1)
+	}
 	if flag.NArg() != 0 {
 		log.Fatalln("no args required")
 	}
