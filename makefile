@@ -37,9 +37,8 @@ bin/${name}: go.mod ./assets/assets.go $(gofiles)
 	mkdir -p bin
 	cd bin && $(call buildfunc,../)
 ./assets/assets.go: ${EMBED_ARGS}
-	@export PATH=${PATH}:${gopath}/bin
 	type go-bindata || GOBIN=${gopath}/bin go install github.com/aerth/go-bindata
-	go-bindata -pkg assets -o $@ ${EMBED_ARGS}
+	${gopath}/bin/go-bindata -pkg assets -o $@ ${EMBED_ARGS}
 # cross compile release
 crossdirs ?= bin/linux bin/freebsd bin/osx bin/windows
 cross: go.mod $(gofiles)
