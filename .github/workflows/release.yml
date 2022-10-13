@@ -20,7 +20,7 @@ jobs:
       - name: Generate
         uses: skx/github-action-build@master
         with:
-          builder: make release
+          builder: .github/release
       - name: Publish release
         id: release
         uses: ncipollo/release-action@v1.11.1
