@@ -1,4 +1,4 @@
-module gomaker
+module github.com/aerth/gomaker
 
 go 1.20
 

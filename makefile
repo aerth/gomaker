@@ -39,14 +39,20 @@ bin/${name}: go.mod ./assets/assets.go $(gofiles)
 ./assets/assets.go: ${EMBED_ARGS}
 	go run github.com/aerth/go-bindata/cmd/go-bindata -pkg assets -o $@ ${EMBED_ARGS}
 # cross compile release
-crossdirs ?= bin/linux bin/freebsd bin/osx bin/windows
-cross: go.mod $(gofiles)
+crossdirs ?= bin/${name}-linux bin/${name}-freebsd bin/${name}-osx bin/${name}-windows
+cross: go.mod assets/assets.go $(gofiles)
 	mkdir -v -p $(crossdirs) 
 	# unroll here if needed
-	cd bin/linux && $(call buildfunc,../../)
-	cd bin/freebsd && GOOS=freebsd $(call buildfunc,../../)
-	cd bin/osx && GOOS=darwin $(call buildfunc,../../)
-	cd bin/windows && GOOS=windows $(call buildfunc,../../)
+	cd bin/${name}-linux && $(call buildfunc,../../)
+	cd bin/${name}-freebsd && GOOS=freebsd $(call buildfunc,../../)
+	cd bin/${name}-osx && GOOS=darwin $(call buildfunc,../../)
+	cd bin/${name}-windows && GOOS=windows $(call buildfunc,../../)
+release: cross
+	cd bin/ && \
+		tar -czf ${name}-linux.tar.gz ${name}-linux && \
+		tar -czf ${name}-freebsd.tar.gz ${name}-freebsd && \
+		tar -czf ${name}-osx.tar.gz ${name}-osx && \
+		zip -r ${name}-windows.zip ${name}-windows 
 help:
 	@echo "name:    ${name}"
 	@echo "module:  ${module}"

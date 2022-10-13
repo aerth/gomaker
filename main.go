@@ -2,11 +2,12 @@ package main
 
 import (
 	"flag"
-	"gomaker/assets"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+
+	"github.com/aerth/gomaker/assets"
 )
 
 var version string

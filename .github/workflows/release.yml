@@ -20,7 +20,7 @@ jobs:
       - name: Generate
         uses: skx/github-action-build@master
         with:
-          builder: .github/build
+          builder: make release
       - name: Publish release
         id: release
         uses: ncipollo/release-action@v1.11.1
@@ -28,8 +28,7 @@ jobs:
           allowUpdates: true
           artifactErrorsFailBuild: false
           artifacts: |
-            ${{ github.workspace }}/README.md
-            bin/*
+            bin/*.*
           artifactContentType: "raw"
           #discussionCategory: "Release"
           draft: false
